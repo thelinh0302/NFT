@@ -46,5 +46,31 @@ describe('ERC20-Gold token', () => {
             await expect(token.transfer(accountB.address, amount)).to.be.revertedWith('Pausable: paused')
         })
     })
+    describe('unpause()',()=>{
+        beforeEach( async ()=>{
+            await token.pause()
+        })
+        it('should revert if not pauser role', async()=>{
+            await expect(token.connect(accountB).unpause()).to.be.reverted
+        })
+        it('should revert if contract has been unpause', async()=>{
+            await token.unpause()
+            await expect(token.unpause()).to.be.revertedWith('Pausable: not paused')
+        })
+        it('should pause contract correctly', async ()=>{
+            const unpauseTx = await token.unpause();
+            await expect(unpauseTx).to.be.emit(token,'Unpaused').withArgs(accountA.address)
+            let transferTx = await token.transfer(accountB.address, amount)
+            await expect(transferTx).to.be.emit(token,'Transfer').withArgs(accountA.address,accountB.address,amount)
+        })
+    })
+
+    describe('addToBlackList()',()=>{
+        it('should revert in case add sender to blacklist',async ()=>{
+            await expect(token.addToBlackList(accountA.address)).to.be.revertedWith('Gold: must not add sender to blacklist')
+        })
+        
+    })
+
 
 })
