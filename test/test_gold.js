@@ -69,7 +69,43 @@ describe('ERC20-Gold token', () => {
         it('should revert in case add sender to blacklist',async ()=>{
             await expect(token.addToBlackList(accountA.address)).to.be.revertedWith('Gold: must not add sender to blacklist')
         })
-        
+        it('should revert if account has been added to blacklist', async () => {
+            await token.addToBlackList(accountB.address)
+            await expect(token.addToBlackList(accountB.address)).to.be.revertedWith("Gold: account was on blacklist")
+        })
+        it('should revert if not admin role', async () => {
+            await expect(token.connect(accountB).addToBlackList(accountC.address)).to.be.reverted
+        })
+
+        it('should add to BlackList correctly', async () => {
+            token.transfer(accountB.address, amount)
+            token.transfer(accountC.address, amount)
+            await token.addToBlackList(accountB.address)
+
+            await expect(token.connect(accountB).transfer(accountC.address, amount)).to.be.reverted
+            await expect(token.connect(accountC).transfer(accountB.address,amount)).to.be.reverted
+        })
+    })
+    describe('removeToBlackList()', () => {
+        beforeEach(async () => {
+            token.transfer(accountB.address, amount)
+            token.transfer(accountC.address, amount)
+            await token.addToBlackList(accountB.address)
+        })
+        it('should revert if account has not been added to blacklist', async () => {
+            await token.removeToBlackList(accountB.address)
+            await expect(token.removeToBlackList(accountB.address)).to.be.revertedWith('Gold: account was not on blacklist')
+        })
+
+        it('should revert if not admin role', async () => {
+            await expect(token.connect(accountB).removeToBlackList(accountC.address)).to.be.reverted
+        })
+
+        it('should remove from blacklist correctly', async () => {
+            await token.removeToBlackList(accountB.address)
+            const transferTx = token.transfer(accountB.address, amount)
+            await expect(transferTx).to.emit(token,'Transfer').withArgs(accountA.address,accountB.address,amount)
+        })
     })
 
 
