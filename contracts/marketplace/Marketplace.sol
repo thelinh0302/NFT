@@ -53,12 +53,75 @@ contract Marketplace is Ownable {
         address feeRecipient_)
     {
         require(nftAddress_ != address(0),"NFTMarketplace: nftAddress_ is zero address");
-        require(feeRecipient_ != address(0),"NFTMarketplace: feeRecipient_ is zero address");     
         nftContract = IERC721(nftAddress_);
-        feeRecipient =feeRecipient_;
+        _updateFeeRecipient(feeRecipient_);
+       _updateFeeRate(feeDecimal_,feeRate_);
+        _orderIdCount.increment();
+    }
+
+    function _updateFeeRecipient(address feeRecipient_) internal{
+        require(feeRecipient_ != address(0),"NFTMarketplace: feeRecipient_ is zero address");     
+        feeRecipient = feeRecipient_;
+    }
+    function updateFeeRecipient(address feeRecipient_) external onlyOwner {
+        _updateFeeRecipient(feeRecipient_);
+    }
+
+    function _updateFeeRate(uint256 feeDecimal_, uint256 feeRate_) internal{
+        require(feeRate_ < 10**(feeDecimal_+2),"NFTMarketplace: bad fee rate");
         feeDecimal = feeDecimal_;
         feeRate = feeRate_;
-        _orderIdCount.increment();  
+        emit FeeRateUpdated(feeDecimal_,feeRate_);
+    }
+
+    function updateFeeRate(uint256 feeRate_,uint feeDecimal_) external onlyOwner {
+        _updateFeeRate(feeDecimal_, feeRate_);
+    }
+    
+    function _calculateFee(uint256 orderId_ )private view returns(uint256){
+        Order storage _order = orders[orderId_];
+        if(feeRate == 0){
+            return 0;
+        }
+        return (feeRate * _order.price) / 10**(feeDecimal +2); 
+    }
+    function isSeller(uint256 orderId_,address seller_) public view returns(bool){
+        return orders[orderId_].seller == seller_;
+    }
+    function addPaymentToken(address paymentToken_) external onlyOwner{
+        require(paymentToken_ != address(0),"NFTMarketplace: feeRecipient_ is zero address");
+        require(_supportedPaymentTokens.add(paymentToken_),"NFTMarketplace: already supported");
+
+    }
+
+    function isPaymentTokenSupported(address paymentToken_) public view returns(bool){
+        return _supportedPaymentTokens.contains((paymentToken_));
+    }
+    modifier onlySupportedPaymentToken(address paymentToken_){
+        require(isPaymentTokenSupported(paymentToken_),"NFTMarketplace: unsupport payment token");
+        _;
+    }
+
+    function addOrder(uint256 tokenId_,address paymentToken_,uint256 price_) public onlySupportedPaymentToken(paymentToken_){
+        uint256 _orderId = _orderIdCount.current();
+        orders[_orderId] = Order(
+            _msgSender(),
+            address(0),
+            tokenId_,
+            paymentToken_,
+            price_
+        );
+        nftContract.transferFrom(_msgSender(),address(0),tokenId_);
+        emit OrderAdded(_orderId,_msgSender(),tokenId_,paymentToken_,price_);
+    }
+    function cancelOrder(uint256 orderId_) external{
+        Order storage _order = orders[orderId_];
+        require(_order.buyer == address(0),"NFTMarketplace: buyer must be zero");
+        require(_order.seller == _msgSender(),"NFTMarketplace: must be owner");
+        uint256 _tokenId = _order.tokenId;
+        delete orders[orderId_];
+        nftContract.transferFrom(address(this),_msgSender(),_tokenId);
+        emit OrderCancelled(orderId_);
     }
 
 }
