@@ -111,7 +111,7 @@ contract Marketplace is Ownable {
             paymentToken_,
             price_
         );
-        nftContract.transferFrom(_msgSender(),address(0),tokenId_);
+        nftContract.transferFrom(_msgSender(),address(this),tokenId_);
         emit OrderAdded(_orderId,_msgSender(),tokenId_,paymentToken_,price_);
     }
     function cancelOrder(uint256 orderId_) external{
@@ -122,6 +122,20 @@ contract Marketplace is Ownable {
         delete orders[orderId_];
         nftContract.transferFrom(address(this),_msgSender(),_tokenId);
         emit OrderCancelled(orderId_);
+    }
+    function executeOrder(uint256 orderId_) external{
+        require(!isSeller(orderId_,_msgSender()),"NFTMarketplace: buyer must be different from seller ");
+        require(orders[orderId_].buyer == address(0),"NFTMarketplace: buyer must be zero");
+        Order storage _order = orders[orderId_];
+        _order.buyer = _msgSender();
+        uint256 _feeAmount = _calculateFee(orderId_);
+
+        if(_feeAmount > 0){
+            IERC20(_order.paymentToken).transferFrom(_msgSender(), feeRecipient, _feeAmount);
+        }
+        IERC20(_order.paymentToken).transferFrom(_msgSender(), _order.seller, _order.price - _feeAmount);
+        nftContract.transferFrom(address(this),_msgSender(),_order.tokenId);
+        emit OrderMatched(orderId_, _order.seller, _order.buyer,_order.tokenId, _order.paymentToken, _order.price);
     }
 
 }
