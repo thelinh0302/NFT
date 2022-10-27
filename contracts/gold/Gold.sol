@@ -11,7 +11,7 @@ contract Gold is ERC20, Pausable, AccessControl {
     mapping(address=>bool) private _blacklist;
     event BlackListAdd(address account);
     event BlackListRemove(address account);
-    constructor() ERC20("GOLD","GLD"){
+    constructor() ERC20("GOLD","LCC"){
         
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         
